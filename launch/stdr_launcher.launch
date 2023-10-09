@@ -1,0 +1,13 @@
+<launch>
+
+	<!-- Open rqt_gui -->
+	<node pkg="rqt_gui" type="rqt_gui" name="rqt" />
+	
+	<!-- Launch with STDR and a default robot-->
+	<include file="$(find robot_no_crash)/launch/robot_supervisor.launch">
+		<arg name="switch" value="true" />
+	</include>
+
+	<include file="$(find stdr_launchers)/launch/server_with_map_and_gui_plus_robot.launch" />
+
+ </launch>

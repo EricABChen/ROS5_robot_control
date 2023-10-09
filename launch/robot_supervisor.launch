@@ -1,0 +1,14 @@
+<launch>
+
+	<!-- Default param setup -->
+	<arg name="robot_ns" default="robot0" />
+	
+	<arg name="switch" default="false" />
+
+	<node name="node_$(arg robot_ns)" type="robot_no_crash_node" pkg="robot_no_crash" ns="$(arg robot_ns)" output="screen">
+	 	<!-- Remap between lasers -->
+		<remap from="laser_1" to="laser_0" if="$(arg switch)"/>
+	</node>
+	<param name="wall_dist" value="0.5" type="double"/>
+	
+</launch>

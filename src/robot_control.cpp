@@ -1,47 +1,38 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
-#include "geometry_msgs/Twist.h"
 #include "sensor_msgs/LaserScan.h"
-#include <sstream>
+#include "geometry_msgs/Twist.h"
 
-#define PI 3.1415926
+void laserScan_callback(const sensor_msgs::LaserScan::ConstPtr &msgs);
+void desvel_callback(const geometry_msgs::Twist::ConstPtr &msgs);
 
-// Global Variabies Definition
+// Globals
+bool manual_control_enable = false;
+bool hit = false;
 sensor_msgs::LaserScan laser_data;
 geometry_msgs::Twist cmd_vel;
-bool manual_control = false;
-bool low_distance = false;
 
-// Callback Function Definition
-void vel_callback(const geometry_msgs::Twist::ConstPtr &msgs) {
-    manual_control = true;
+// Callback
+void laserScan_callback(const sensor_msgs::LaserScan::ConstPtr &msgs) {
+    laser_data = *msgs;
+}
+
+void desvel_callback(const geometry_msgs::Twist::ConstPtr &msgs) {
+    manual_control_enable = true;
     cmd_vel = *msgs;
     ROS_INFO("Manual Command: Forward velocity %2.2f; Angular velocity %2.2f", msgs->linear.x, msgs->angular.z);
 }
 
-void laser_callback(const sensor_msgs::LaserScan::ConstPtr &msgs) {
-    laser_data = *msgs;
-}
-
 int main(int argc, char **argv) {
-    // Init the node
+    // Init node, nodehandle, publisher and subscriber, loop rate
     ros::init(argc, argv, "robot_no_crash_node");
-
-    // Init the handle
-    ros::NodeHandle node_handle;
-
-    // Init the subscriber
-    ros::Subscriber sub_1 = node_handle.subscribe("des_vel", 10, vel_callback);
-    ros::Subscriber sub_2 = node_handle.subscribe("laser_1", 10, laser_callback);
-
-    // Init the publisher
-    ros::Publisher cmd_vel_pub = node_handle.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
-
-    // Init the loop_rate
+    ros::NodeHandle publisher_handle;
+    ros::Publisher p_pub = publisher_handle.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
+    ros::Subscriber sub_vel = publisher_handle.subscribe("des_vel", 10, desvel_callback);
+    ros::Subscriber sub_laser = publisher_handle.subscribe("laser_1", 10, laserScan_callback);
     ros::Rate loop_rate(10);
     
-    
-    // Init velocity
+    // Initial speed
     cmd_vel.linear.x = 0.1;
     cmd_vel.linear.y = 0;
     cmd_vel.linear.z = 0;
@@ -49,57 +40,56 @@ int main(int argc, char **argv) {
     cmd_vel.angular.y = 0;
     cmd_vel.angular.z = 0;
     
-    // Init the wall_dist
-    double wall_dist = 1;
+    // Init wall_dist with a default value
+    double wall_dist = 1.0;
     ROS_INFO_ONCE("wall_dist began with: [%2.2f]", wall_dist);
-    if (node_handle.getParamCached("/wall_dist", wall_dist)) {
-        ROS_INFO("wall_dist is updated to: [%2.2f]", wall_dist);
-    } else {
-        ROS_ERROR("Failed to get param 'wall_dist'");
+    
+    if (publisher_handle.getParamCached("/wall_dist", wall_dist)) {
+        ROS_INFO("wall_dist was updated to: [%2.2f]", wall_dist);
     }
+    
     ROS_INFO_ONCE("wall_dist is now: [%2.2f]", wall_dist);
 
-    // Init detect angle
-    float detect_angle = 0.5 * PI;
-
-    // Run the robot
+    // Detect angle of the laser, consider data within [-1/2*PI, 1/2*PI] to avoid collision
+    const float detect_angle = 45 * 3.14 / 180;
+    
     while (ros::ok()) {
-        // Detect the distance
-        low_distance = false;
-        int range_length = ceil((laser_data.angle_max - laser_data.angle_min) / laser_data.angle_increment);
-        for (int i = 0; i < range_length; i++) {
-            float scan_angle = laser_data.angle_min + i * laser_data.angle_increment;
+        hit = false;
+        float current_discance = 0.0;
+        int detect_range = (laser_data.angle_max - laser_data.angle_min) / laser_data.angle_increment;
+        // Only data within detect angle will be taken into consideration
+        for (int i = 0; i < detect_range; i++) {
+            float scan_angle = laser_data.angle_min + laser_data.angle_increment * i;
             if (scan_angle >= -detect_angle && scan_angle <= detect_angle) {
-                if (laser_data.ranges[i] <= wall_dist) {
-                    low_distance = true;
+                if (laser_data.ranges[i] <= wall_dist) { // the distance at a certain angle
+                    current_discance = laser_data.ranges[i];
+                    hit = true;
                     break;
                 }
             }
         }
-
-        // determine what to publish and publish the cmd
-        if (range_length > 0) {
-            if (low_distance) {
+       
+        if (detect_range > 0) {
+            if (hit) {
                 cmd_vel.linear.x = 0;
-                cmd_vel.angular.z = 0.2;
-                ROS_WARN("Auto control: Turn");
-                manual_control = false;
-            } else {
-                if (!manual_control) {
-                    cmd_vel.linear.x = 0.1;
+                cmd_vel.angular.z = 0.2;            
+                ROS_WARN("Turning");
+                manual_control_enable = false;
+            } 
+            else {
+                if (!manual_control_enable) {
+                    cmd_vel.linear.x = 0.2;
                     cmd_vel.angular.z = 0;
-                    ROS_INFO("Auto control: Move");
-                } else {
-                    ROS_INFO("Manual control");
-                    manual_control = false;
-                }
+                    ROS_INFO("Moving Forward");
+                } 
             }
-            cmd_vel_pub.publish(cmd_vel);
-        } else {
-            ROS_WARN("No connected robot");
+            p_pub.publish(cmd_vel);
+        } 
+        else {
+            ROS_WARN("No Robot Connected!");
         }
         
-        // Update
+
         ros::spinOnce();
         loop_rate.sleep();
     }
