@@ -9,6 +9,9 @@
 	 	<!-- Remap between lasers -->
 		<remap from="laser_1" to="laser_0" if="$(arg switch)"/>
 	</node>
+	
+	<!-- Default param for robot behavior-->
 	<param name="wall_dist" value="0.5" type="double"/>
+	<param name="detect_sensitivity" value="45.0" type="double"/>
 	
 </launch>
