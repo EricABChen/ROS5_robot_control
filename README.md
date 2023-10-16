@@ -21,6 +21,7 @@ To launch the model in STDR, you need to first
 
 This command will launch the STDR model with a default robot
 
+
 ### Connect to multiple robot models
 
 - Create a new robot Node with default nodename:
@@ -44,3 +45,10 @@ This command will launch the STDR model with a default robot
 - The robot is connected automatically
 
 Note: you can also manually add a node by `rosrun robot_no_crash robot_no_crash_node __ns:=robot0`, make sure that `__ns` should match with the STDR simulator
+
+## Parameter setup
+
+This implementation have two parameters to control the behavior of the robot to avoid collision
+
+- `wall_dist`: the minimum distance to the wall, the robot will attempt to turn when the real-time distance is below this value
+- `detect_sensitivity`: the range of the sensor, only sensor data within certain degrees(specify by this param) directly ahead will be considered
