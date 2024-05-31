@@ -1,4 +1,4 @@
-# ecse473_f23_axc1293_navigation_control
+# ROS5_navigation_control
 
 ## Package description
 This repo is a ROS package that contains the navigation control simulation for a robot to avoid collision
